@@ -1,5 +1,6 @@
 import os
 import random
+import re
 
 import discord
 from dotenv import load_dotenv
@@ -30,6 +31,7 @@ async def on_member_join(member):
 
 @client.event
 async def on_message(message):
+
     if message.author == client.user:
         return
     
@@ -46,5 +48,17 @@ async def on_message(message):
         response = random.choice(brooklyn_99_quotes)
         await message.channel.send(response)
 
+    elif re.search("^t! create-role ", message.content):
+        await create_role(message)
+
+# create role
+async def create_role(message):
+    guild = discord.utils.get(client.guilds, name=GUILD)
+    role = message.content.split("t! create-role ", 1)[1]
+    if discord.utils.get(guild.roles, name=role):
+        await message.channel.send(f'{role} already exists!')
+    else:
+        await guild.create_role(name=role)
+        await message.channel.send(f'{role} created!')
 
 client.run(TOKEN)
