@@ -1,4 +1,7 @@
-# What is Tazer Bot
+![alt text](http://url/to/img.png)
+
+# What is Tazer Bot ![image](https://user-images.githubusercontent.com/65947894/111057649-18d4fc80-84c4-11eb-8e0e-5213060752af.png)
+
 Tazer is a discord meeting creation bot where it will help you in create and delete meeting related commands to provide you a streamlined meeting in discord.
 
 # How does it work?
