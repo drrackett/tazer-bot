@@ -6,7 +6,7 @@ Still a work in progress
 
 
 
-**The features of Tazer Bot**
+### **The features of Tazer Bot**
 - create/delete roles
 - create & delete voice & text channel
 - add/remove list of members to the discussion-channel with one simple command
