@@ -1,4 +1,4 @@
-# What is Tazer Bot :robot:
+# Tazer Bot :robot:
 Tazer is a discord meeting creation bot where it will help you in create and delete meeting related commands to provide you a streamlined meeting in discord.
 
 ## How does it work?
