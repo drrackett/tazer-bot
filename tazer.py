@@ -44,6 +44,14 @@ async def on_message(message):
     elif re.search("^t! delete-role ", message.content):
         await delete_role(message)
 
+    elif re.search("^t! create-voice-channel ", message.content):
+        channel_name = message.content.split("t! create-voice-channel ", 1)[1]
+        voice_channel = await create_private_voice_channel(channel_name)
+        if voice_channel:
+            await message.channel.send(f'{channel_name} voice channel is created!')
+        else:
+            await message.channel.send(f'{channel_name} voice channel cannot be created!')
+
 # HOST -- refers to the user that initiated the command to create a discussion-room
 # Notes:
 #  1. Which channels are created by default? Voice and/or Text?
@@ -75,5 +83,26 @@ async def delete_role(message):
             await message.channel.send(f'{role_name} deleted!')
         except discord.Forbidden:
             await message.channel.send(f'Forbidden to delete {role_name}!')
+
+# create a private voice channel
+# current: voice_channel not created if already exists, and role needs to be 
+#          created before creating corresponding voice_channel
+async def create_private_voice_channel(channel_name):
+    guild = discord.utils.get(client.guilds, name=GUILD)
+    if discord.utils.get(guild.voice_channels, name=channel_name):
+        # raise exception
+        pass
+    else:
+        # role = await create_role(channel_name)
+        channel_admin = discord.utils.get(guild.roles, name=channel_name)
+        if channel_admin is None:
+            return
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            guild.me: discord.PermissionOverwrite(read_messages=True),
+            channel_admin: discord.PermissionOverwrite(read_messages=True)
+        }
+        channel = await guild.create_voice_channel(name=channel_name, overwrites=overwrites)
+
 
 client.run(TOKEN)
