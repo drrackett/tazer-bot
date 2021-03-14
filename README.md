@@ -9,3 +9,6 @@ Still a work in progress
 - create & delete voice & text channel
 - add/remove list of members to the discussion-channel with one simple command
 - set of time (eg. 1hr then it will delete itself - voice & chat channel)
+
+## License
+[MIT](https://choosealicense.com/licenses/mit/)
