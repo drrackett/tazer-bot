@@ -46,12 +46,10 @@ async def on_message(message):
 
     # List of commands here - will switch to discord commands later
     if re.search("^t! start ", message.content):
-        host = message.author
         room_name = message.content.split("t! start ", 1)[1].split(" ", 1)[0]
         members = message.mentions
-        room = await create_discussion_room(host, room_name, members)
-        # print(type(room))
-        # DISCUSSION_ROOMS[room] = host
+        room = await create_discussion_room(message.author, room_name, members)
+        DISCUSSION_ROOMS[room] = message.author
         await message.channel.send(f'{room_name} is created!')
 
     elif re.search("^t! add ", message.content):
@@ -180,7 +178,7 @@ async def create_discussion_room(host, room_name, members):
 
     p_voice_channel = await create_private_voice_channel(room_name)
     p_text_channel = await create_private_text_channel(room_name)
-    return p_voice_channel
+    return p_text_channel
 
 async def add_members(message):
     guild = discord.utils.get(client.guilds, name=GUILD)
@@ -226,14 +224,14 @@ async def delete_discussion_room(message):
     text_channel = message.channel
     assert message.author in text_channel.members
 
-    '''if not message.author == DISCUSSION_ROOMS[text_channel]:
+    if not message.author == DISCUSSION_ROOMS[text_channel]:
         await message.channel.send(f'Only the host, {DISCUSSION_ROOMS[text_channel]} can end this discussion room!')
-        return'''
+        return
 
     voice_channel = discord.utils.get(guild.voice_channels, name=text_channel.name)
     role = discord.utils.get(guild.roles, name=text_channel.name)
 
-    # DISCUSSION_ROOMS.pop(text_channel)
+    DISCUSSION_ROOMS.pop(text_channel)
 
     # delete text and voice channels created and role created
     await voice_channel.delete()
