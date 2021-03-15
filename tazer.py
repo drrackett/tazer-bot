@@ -14,6 +14,9 @@ intents = discord.Intents.default()
 intents.members = True
 client = discord.Client(intents=intents)
 
+# store voice_channel as key and user created as key
+DISCUSSION_ROOMS = {}
+
 
 @client.event
 async def on_ready():
@@ -43,8 +46,10 @@ async def on_message(message):
 
     # List of commands here - will switch to discord commands later
     if re.search("^t! start ", message.content):
-        room_name = message.content.split("t! start ", 1)[1]
-        room = await create_discussion_room(message.author, room_name)
+        room_name = message.content.split("t! start ", 1)[1].split(" ", 1)[0]
+        members = message.mentions
+        room = await create_discussion_room(message.author, room_name, members)
+        DISCUSSION_ROOMS[room] = message.author
         await message.channel.send(f'{room_name} is created!')
 
     elif re.search("^t! add ", message.content):
@@ -52,6 +57,26 @@ async def on_message(message):
 
     elif re.search("^t! remove ", message.content):
         await remove_members(message)
+
+    elif re.search("^t! end", message.content):
+        await delete_discussion_room(message)
+
+    '''elif message.content.startswith('$greet'):
+        channel = message.channel
+        await channel.send('Say hello!')
+
+        verifymsg2 = await client.send_message(channel, "React with 👍 to gain access to Hard Chats.")
+        await client.add_reaction(verifymsg2, "👍")
+
+        def check(reaction, user):
+            return user == message.author and str(reaction.emoji) == '👍'
+
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+        except asyncio.TimeoutError:
+            await channel.send('👎')
+        else:
+            await channel.send('👍')'''
 
     # elif re.search("^t! create-role ", message.content):
         # await create_role(message)
@@ -143,11 +168,17 @@ async def create_private_text_channel(channel_name):
 async def assign_role(member, role):
     await member.add_roles(role)
 
-async def create_discussion_room(host, room_name):
+async def create_discussion_room(host, room_name, members):
     role = await create_role(room_name)
+
     await assign_role(host, role)
+    for member in members:
+        if not member == client.user:
+            await member.add_roles(role)
+
     p_voice_channel = await create_private_voice_channel(room_name)
     p_text_channel = await create_private_text_channel(room_name)
+    return p_text_channel
 
 async def add_members(message):
     guild = discord.utils.get(client.guilds, name=GUILD)
@@ -178,17 +209,33 @@ async def remove_members(message):
     guild = discord.utils.get(client.guilds, name=GUILD)
 
     channel = message.channel
-    # make sure message.author in channel.members
+    assert message.author in channel.members
 
     role = discord.utils.get(guild.roles, name=channel.name)
 
-    # members <- get all members to add
-    all_names = message.content.split("t! remove ", 1)[1]
-    all_names = map(lambda name: name.strip(), all_names.split(","))
+    for member in message.mentions:
+        if not member == client.user:
+            await member.remove_roles(role)
 
-    for name in all_names:
-        member = discord.utils.get(guild.members, name=name)
-        await member.remove_roles(role)
 
+async def delete_discussion_room(message):
+    guild = discord.utils.get(client.guilds, name=GUILD)
+
+    text_channel = message.channel
+    assert message.author in text_channel.members
+
+    if not message.author == DISCUSSION_ROOMS[text_channel]:
+        await message.channel.send(f'Only the host, {DISCUSSION_ROOMS[text_channel]} can end this discussion room!')
+        return
+
+    voice_channel = discord.utils.get(guild.voice_channels, name=text_channel.name)
+    role = discord.utils.get(guild.roles, name=text_channel.name)
+
+    DISCUSSION_ROOMS.pop(text_channel)
+
+    # delete text and voice channels created and role created
+    await voice_channel.delete()
+    await text_channel.delete()
+    await role.delete()
 
 client.run(TOKEN)
