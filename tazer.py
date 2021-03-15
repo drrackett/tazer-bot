@@ -208,10 +208,14 @@ async def add_members(message):
 async def remove_members(message):
     guild = discord.utils.get(client.guilds, name=GUILD)
 
-    channel = message.channel
-    assert message.author in channel.members
+    text_channel = message.channel
+    assert message.author in text_channel.members
 
-    role = discord.utils.get(guild.roles, name=channel.name)
+    if not message.author == DISCUSSION_ROOMS[text_channel]:
+        await message.channel.send(f'Only the host, {DISCUSSION_ROOMS[text_channel]} can remove people from this discussion room!')
+        return
+
+    role = discord.utils.get(guild.roles, name=text_channel.name)
 
     for member in message.mentions:
         if not member == client.user:
