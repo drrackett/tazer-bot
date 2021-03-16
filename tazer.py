@@ -297,6 +297,7 @@ async def delete_discussion_room(message):
     await text_channel.delete()
     await role.delete()
 
+#clear text messages in discussion room or text channel
 async def clear(ctx, amount):
     await ctx.channel.purge(limit=amount)
 
