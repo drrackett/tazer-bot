@@ -19,6 +19,7 @@ DISCUSSION_ROOMS = {}
 CATEGORY_NAME = 'DISCUSSION ROOMS'
 
 VOICE_CHANNEL = 'voice_channel'
+CATEGORY = None
 
 
 @client.event
@@ -32,7 +33,9 @@ async def on_ready():
         f'{guild.name}(id: {guild.id})\n'
     )
 
-    await guild.create_category(CATEGORY_NAME)
+    global CATEGORY
+    CATEGORY = await guild.create_category_channel(CATEGORY_NAME)
+
 
 @client.event
 async def on_member_join(member):
@@ -41,6 +44,20 @@ async def on_member_join(member):
     await member.dm_channel.send(
         f'Hi {member.name}, welcome to my Discord server!'
     )
+
+
+async def destruct_by_room(room):
+    await room['role'].delete()
+    await room['text_channel'].delete()
+    await room[VOICE_CHANNEL].delete()
+
+
+async def cleanup():
+    for room, room_props in DISCUSSION_ROOMS.items():
+        await destruct_by_room(room_props)
+    await CATEGORY.delete()
+    await client.close()
+
 
 @client.event
 async def on_message(message):
@@ -72,6 +89,9 @@ async def on_message(message):
     
     elif re.search("^t! clear", message.content):
         await clear(message)
+
+    elif re.search("^t! disconnect", message.content):
+        await cleanup()
 
     '''elif message.content.startswith('$greet'):
         channel = message.channel
@@ -154,7 +174,7 @@ async def create_private_voice_channel(channel_name, role_allowed):
             guild.me: discord.PermissionOverwrite(read_messages=True),
             role_allowed: discord.PermissionOverwrite(read_messages=True)
         }
-        voice_channel = await guild.create_voice_channel(name=channel_name, overwrites=overwrites)
+        voice_channel = await CATEGORY.create_voice_channel(name=channel_name, overwrites=overwrites)
     return voice_channel
 
 
@@ -173,7 +193,7 @@ async def create_private_text_channel(channel_name, role_allowed):
             guild.me: discord.PermissionOverwrite(read_messages=True),
             role_allowed: discord.PermissionOverwrite(read_messages=True)
         }
-        txt_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+        txt_channel = await CATEGORY.create_text_channel(name=channel_name, overwrites=overwrites)
     return txt_channel
 
 
@@ -260,8 +280,6 @@ async def remove_members(message):
 
 
 async def delete_discussion_room(message):
-    guild = discord.utils.get(client.guilds, name=GUILD)
-
     text_channel = message.channel
     assert message.author in text_channel.members
 
