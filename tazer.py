@@ -5,6 +5,9 @@ import re
 import discord
 from dotenv import load_dotenv
 
+RGB_MIN = 0
+RGB_MAX = 255
+
 # load_dotenv(os.path.join(os.getcwd(), '.env'))
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -138,7 +141,9 @@ async def on_message(message):
 async def create_role(role_name):
     guild = discord.utils.get(client.guilds, name=GUILD)
     if discord.utils.get(guild.roles, name=role_name) is None:
-        role = await guild.create_role(name=role_name, color=discord.Colour.random())
+        role_color = discord.Colour.from_rgb(random.randint(RGB_MIN, RGB_MAX), 
+        random.randint(RGB_MIN, RGB_MAX), random.randint(RGB_MIN, RGB_MAX))
+        role = await guild.create_role(name=role_name, color=role_color)
     else:
         print(f'Role {role_name} existed!')
         raise
