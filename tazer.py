@@ -16,6 +16,9 @@ client = discord.Client(intents=intents)
 
 # store voice_channel as key and user created as key
 DISCUSSION_ROOMS = {}
+CATEGORY_NAME = 'DISCUSSION ROOMS'
+
+VOICE_CHANNEL = 'voice_channel'
 
 
 @client.event
@@ -28,6 +31,8 @@ async def on_ready():
         f'{client.user} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})\n'
     )
+
+    await guild.create_category(CATEGORY_NAME)
 
 @client.event
 async def on_member_join(member):
@@ -46,11 +51,13 @@ async def on_message(message):
 
     # List of commands here - will switch to discord commands later
     if re.search("^t! start ", message.content):
+        await message.delete()
         room_name = message.content.split("t! start ", 1)[1].split(" ", 1)[0]
         members = message.mentions
         room = await create_discussion_room(message.author, room_name, members)
-        DISCUSSION_ROOMS[room] = message.author
-        await message.channel.send(f'{room_name} is created!')
+        assert room is not None
+        # notify host (created) and members (invited)
+        await message.author.send(f'{room_name} is created!')
 
     elif re.search("^t! add ", message.content):
         await add_members(message)
@@ -61,6 +68,8 @@ async def on_message(message):
     elif re.search("^t! end", message.content):
         await delete_discussion_room(message)
 
+    # elif re.search("^t! config category ", message.content):
+    
     elif re.search("^t! clear", message.content):
         await clear(message)
 
@@ -103,14 +112,17 @@ async def on_message(message):
 #  4. Later combine create role and channels into ONE command
 #  5. Implement a time tracker to countdown on each discussion-room
 
-# create role -- to be implemented: create and assigned the role to the host 
+
+# create role
 async def create_role(role_name):
     guild = discord.utils.get(client.guilds, name=GUILD)
     if discord.utils.get(guild.roles, name=role_name) is None:
         role = await guild.create_role(name=role_name)
     else:
-        pass # name has to be unique
+        print(f'Role {role_name} existed!')
+        raise
     return role
+
 
 # delete role -- to be implemented (when channels can be created): only the host can delete its own role
 async def delete_role(message):
@@ -126,62 +138,84 @@ async def delete_role(message):
         except discord.Forbidden:
             await message.channel.send(f'Forbidden to delete {role_name}!')
 
-# create a private voice channel
-# current: voice_channel not created if already exists, and role needs to be 
-#          created before creating corresponding voice_channel
-async def create_private_voice_channel(channel_name):
-    guild = discord.utils.get(client.guilds, name=GUILD)
-    if discord.utils.get(guild.voice_channels, name=channel_name):
-        # raise exception
-        pass
-    else:
-        # role = await create_role(channel_name)
-        channel_admin = discord.utils.get(guild.roles, name=channel_name)
-        if channel_admin is None:
-            return
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            guild.me: discord.PermissionOverwrite(read_messages=True), # necessary?
-            channel_admin: discord.PermissionOverwrite(read_messages=True)
-        }
-        channel = await guild.create_voice_channel(name=channel_name, overwrites=overwrites)
-    return channel
 
 # create a private voice channel
 # current: voice_channel not created if already exists, and role needs to be 
 #          created before creating corresponding voice_channel
-async def create_private_text_channel(channel_name):
+async def create_private_voice_channel(channel_name, role_allowed):
     guild = discord.utils.get(client.guilds, name=GUILD)
-    if discord.utils.get(guild.text_channels, name=channel_name):
-        # raise exception
-        pass
+    if discord.utils.get(guild.voice_channels, name=channel_name):
+        print(f"Voice channel {channel_name} existed!")
+        raise
     else:
-        # role = await create_role(channel_name)
-        channel_admin = discord.utils.get(guild.roles, name=channel_name)
-        if channel_admin is None:
-            return
+        assert role_allowed is not None
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            guild.me: discord.PermissionOverwrite(read_messages=True), # necessary?
-            channel_admin: discord.PermissionOverwrite(read_messages=True)
+            guild.me: discord.PermissionOverwrite(read_messages=True),
+            role_allowed: discord.PermissionOverwrite(read_messages=True)
         }
-        channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
-    return channel
+        voice_channel = await guild.create_voice_channel(name=channel_name, overwrites=overwrites)
+    return voice_channel
+
+
+# create a private voice channel
+# current: voice_channel not created if already exists, and role needs to be 
+#          created before creating corresponding voice_channel
+async def create_private_text_channel(channel_name, role_allowed):
+    guild = discord.utils.get(client.guilds, name=GUILD)
+    if discord.utils.get(guild.text_channels, name=channel_name):
+        print(f"Text channel {channel_name} existed!")
+        raise
+    else:
+        assert role_allowed is not None
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            guild.me: discord.PermissionOverwrite(read_messages=True),
+            role_allowed: discord.PermissionOverwrite(read_messages=True)
+        }
+        txt_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+    return txt_channel
+
 
 async def assign_role(member, role):
     await member.add_roles(role)
 
+
 async def create_discussion_room(host, room_name, members):
-    role = await create_role(room_name)
+    role = None
+    p_text_channel = None
+    p_voice_channel = None
+    try:
+        # create a role and both private text and voice channels
+        role = await create_role(room_name)
+        p_text_channel = await create_private_text_channel(room_name, role)
+        p_voice_channel = await create_private_voice_channel(room_name, role)
 
-    await assign_role(host, role)
-    for member in members:
-        if not member == client.user:
-            await member.add_roles(role)
-
-    p_voice_channel = await create_private_voice_channel(room_name)
-    p_text_channel = await create_private_text_channel(room_name)
+        # assign the specific role so that members are allowed to join both channels created
+        await host.add_roles(role)
+        for member in members:
+            if not member == client.user:
+                await member.add_roles(role)
+        
+        DISCUSSION_ROOMS[p_text_channel] = {
+            'host': host,
+            'role': role,
+            'text_channel': p_text_channel,
+            VOICE_CHANNEL: p_voice_channel
+        }
+    except:
+        await destruct_discussion_room(role, p_text_channel, p_voice_channel)
     return p_text_channel
+
+
+async def destruct_discussion_room(role, txt_channel, voice_channel):
+    if role is not None:
+        await role.delete()
+    if txt_channel is not None:
+        await txt_channel.delete()
+    if voice_channel is not None:
+        await voice_channel.delete()
+
 
 async def add_members(message):
     guild = discord.utils.get(client.guilds, name=GUILD)
@@ -214,7 +248,7 @@ async def remove_members(message):
     text_channel = message.channel
     assert message.author in text_channel.members
 
-    if not message.author == DISCUSSION_ROOMS[text_channel]:
+    if not message.author == DISCUSSION_ROOMS[text_channel]['host']:
         await message.channel.send(f'Only the host, {DISCUSSION_ROOMS[text_channel]} can remove people from this discussion room!')
         return
 
@@ -231,12 +265,12 @@ async def delete_discussion_room(message):
     text_channel = message.channel
     assert message.author in text_channel.members
 
-    if not message.author == DISCUSSION_ROOMS[text_channel]:
+    if not message.author == DISCUSSION_ROOMS[text_channel]['host']:
         await message.channel.send(f'Only the host, {DISCUSSION_ROOMS[text_channel]} can end this discussion room!')
         return
 
-    voice_channel = discord.utils.get(guild.voice_channels, name=text_channel.name)
-    role = discord.utils.get(guild.roles, name=text_channel.name)
+    voice_channel = DISCUSSION_ROOMS[text_channel][VOICE_CHANNEL]
+    role = DISCUSSION_ROOMS[text_channel]['role']
 
     DISCUSSION_ROOMS.pop(text_channel)
 
