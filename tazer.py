@@ -69,6 +69,9 @@ async def on_message(message):
         await delete_discussion_room(message)
 
     # elif re.search("^t! config category ", message.content):
+    
+    elif re.search("^t! clear", message.content):
+        await clear(message)
 
     '''elif message.content.startswith('$greet'):
         channel = message.channel
@@ -275,5 +278,8 @@ async def delete_discussion_room(message):
     await voice_channel.delete()
     await text_channel.delete()
     await role.delete()
+
+async def clear(ctx, amount):
+    await ctx.channel.purge(limit=amount)
 
 client.run(TOKEN)
