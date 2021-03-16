@@ -16,6 +16,7 @@ client = discord.Client(intents=intents)
 
 # store voice_channel as key and user created as key
 DISCUSSION_ROOMS = {}
+CATEGORY_NAME = 'DISCUSSION ROOMS'
 
 VOICE_CHANNEL = 'voice_channel'
 
@@ -30,6 +31,8 @@ async def on_ready():
         f'{client.user} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})\n'
     )
+
+    await guild.create_category(CATEGORY_NAME)
 
 @client.event
 async def on_member_join(member):
@@ -64,6 +67,8 @@ async def on_message(message):
 
     elif re.search("^t! end", message.content):
         await delete_discussion_room(message)
+
+    # elif re.search("^t! config category ", message.content):
 
     '''elif message.content.startswith('$greet'):
         channel = message.channel
