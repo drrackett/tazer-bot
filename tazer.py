@@ -17,6 +17,8 @@ client = discord.Client(intents=intents)
 # store voice_channel as key and user created as key
 DISCUSSION_ROOMS = {}
 
+VOICE_CHANNEL = 'voice_channel'
+
 
 @client.event
 async def on_ready():
@@ -191,7 +193,7 @@ async def create_discussion_room(host, room_name, members):
             'host': host,
             'role': role,
             'text_channel': p_text_channel,
-            'voice_channel': p_voice_channel
+            VOICE_CHANNEL: p_voice_channel
         }
     except:
         await destruct_discussion_room(role, p_text_channel, p_voice_channel)
@@ -259,8 +261,8 @@ async def delete_discussion_room(message):
         await message.channel.send(f'Only the host, {DISCUSSION_ROOMS[text_channel]} can end this discussion room!')
         return
 
-    voice_channel = discord.utils.get(guild.voice_channels, name=text_channel.name)
-    role = discord.utils.get(guild.roles, name=text_channel.name)
+    voice_channel = DISCUSSION_ROOMS[text_channel][VOICE_CHANNEL]
+    role = DISCUSSION_ROOMS[text_channel]['role']
 
     DISCUSSION_ROOMS.pop(text_channel)
 
