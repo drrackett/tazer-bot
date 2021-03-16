@@ -67,7 +67,7 @@ async def on_message(message):
         return
 
     # List of commands here - will switch to discord commands later
-    if re.search("^t! start ", message.content):
+    if message.content.startswith("t! start"):
         await message.delete()
         room_name = message.content.split("t! start ", 1)[1].split(" ", 1)[0]
         members = message.mentions
@@ -76,21 +76,22 @@ async def on_message(message):
         # notify host (created) and members (invited)
         await message.author.send(f'{room_name} is created!')
 
-    elif re.search("^t! add ", message.content):
+    elif message.content.startswith("t! add"):
         await add_members(message)
 
-    elif re.search("^t! remove ", message.content):
+    elif message.content.startswith("t! remove"):
         await remove_members(message)
 
-    elif re.search("^t! end", message.content):
+    elif message.content.startswith("t! end"):
         await delete_discussion_room(message)
 
     # elif re.search("^t! config category ", message.content):
     
-    elif re.search("^t! clear", message.content):
+    elif message.content.startswith("t! clear"):
         await clear(message)
 
-    elif re.search("^t! disconnect", message.content):
+    elif message.content.startswith("t! disconnect"):
+        await message.delete()
         await cleanup()
 
     '''elif message.content.startswith('$greet'):
