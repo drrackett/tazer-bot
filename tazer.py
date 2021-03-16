@@ -36,6 +36,7 @@ async def on_ready():
     global CATEGORY
     CATEGORY = await guild.create_category_channel(CATEGORY_NAME)
 
+
 @client.event
 async def on_member_join(member):
     # create a direct message channel and use that channel to .send() a direct message
@@ -43,6 +44,20 @@ async def on_member_join(member):
     await member.dm_channel.send(
         f'Hi {member.name}, welcome to my Discord server!'
     )
+
+
+async def destruct_by_room(room):
+    await room['role'].delete()
+    await room['text_channel'].delete()
+    await room[VOICE_CHANNEL].delete()
+
+
+async def cleanup():
+    for room, room_props in DISCUSSION_ROOMS.items():
+        await destruct_by_room(room_props)
+    await CATEGORY.delete()
+    await client.close()
+
 
 @client.event
 async def on_message(message):
@@ -74,6 +89,9 @@ async def on_message(message):
     
     elif re.search("^t! clear", message.content):
         await clear(message)
+
+    elif re.search("^t! disconnect", message.content):
+        await cleanup()
 
     '''elif message.content.startswith('$greet'):
         channel = message.channel
