@@ -138,7 +138,7 @@ async def on_message(message):
 async def create_role(role_name):
     guild = discord.utils.get(client.guilds, name=GUILD)
     if discord.utils.get(guild.roles, name=role_name) is None:
-        role = await guild.create_role(name=role_name)
+        role = await guild.create_role(name=role_name, color=discord.Colour.random())
     else:
         print(f'Role {role_name} existed!')
         raise
