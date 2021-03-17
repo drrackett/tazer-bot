@@ -1,9 +1,14 @@
 import os
 import random
 import re
+import emojis
+import asyncio
 
 import discord
 from dotenv import load_dotenv
+
+RGB_MIN = 0
+RGB_MAX = 255
 
 # load_dotenv(os.path.join(os.getcwd(), '.env'))
 load_dotenv()
@@ -16,7 +21,7 @@ client = discord.Client(intents=intents)
 
 # store voice_channel as key and user created as key
 DISCUSSION_ROOMS = {}
-CATEGORY_NAME = 'DISCUSSION ROOMS'
+CATEGORY_NAME = 'Discussion Rooms'
 
 VOICE_CHANNEL = 'voice_channel'
 CATEGORY = None
@@ -90,6 +95,9 @@ async def on_message(message):
     elif message.content.startswith("t! clear"):
         await clear(message)
 
+    elif message.content.startswith("t! invite"):
+        await invite_members_to_priv_channel(message)
+
     elif message.content.startswith("t! disconnect"):
         await message.delete()
         await cleanup()
@@ -134,13 +142,45 @@ async def on_message(message):
 #  5. Implement a time tracker to countdown on each discussion-room
 
 
+async def invite_members_to_priv_channel(message):
+    guild = discord.utils.get(client.guilds, name=GUILD)
+    embedVar = discord.Embed(title=f"Invite people", 
+    description=f"Here's a list of members not in {message.channel.name}", color=0x00ff00)
+    all_members = guild.members
+    all_emojis = list(emojis.db.get_emoji_aliases().values())
+
+    emojis_used = {}
+    for member in all_members:
+        if member not in message.channel.members:
+            emoji_unicode = random.choice(all_emojis)
+            embedVar.add_field(name=f"{emoji_unicode}", value=f"{member.mention}", inline=True)
+            emojis_used[emoji_unicode] = member
+    bot_msg = await message.channel.send(embed=embedVar)
+
+    for emoji in emojis_used.keys():
+        await bot_msg.add_reaction(emoji)
+
+    def check(reaction, user):
+        return str(reaction.emoji) in list(emojis_used.keys()) and user == message.author
+
+    try:
+        while True:
+            reaction, user = await client.wait_for('reaction_add', timeout=7.0, check=check)
+            await emojis_used[str(reaction.emoji)].add_roles(DISCUSSION_ROOMS[message.channel]['role'])
+            await message.channel.send(f'{emojis_used[str(reaction.emoji)].name} has been added!')
+    except asyncio.TimeoutError:
+        await bot_msg.clear_reactions()
+
+
 # create role
 async def create_role(role_name):
     guild = discord.utils.get(client.guilds, name=GUILD)
     if discord.utils.get(guild.roles, name=role_name) is None:
-        role = await guild.create_role(name=role_name)
+        role_color = discord.Colour.from_rgb(random.randint(RGB_MIN, RGB_MAX), 
+        random.randint(RGB_MIN, RGB_MAX), random.randint(RGB_MIN, RGB_MAX))
+        role = await guild.create_role(name=role_name, color=role_color)
     else:
-        print(f'Role {role_name} existed!')
+        print(f'Role {role_name} existed!') # for debugging purposes
         raise
     return role
 
@@ -190,9 +230,9 @@ async def create_private_text_channel(channel_name, role_allowed):
     else:
         assert role_allowed is not None
         overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            guild.me: discord.PermissionOverwrite(read_messages=True),
-            role_allowed: discord.PermissionOverwrite(read_messages=True)
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(view_channel=True),
+            role_allowed: discord.PermissionOverwrite(view_channel=True)
         }
         txt_channel = await CATEGORY.create_text_channel(name=channel_name, overwrites=overwrites)
     return txt_channel
