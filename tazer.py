@@ -2,7 +2,7 @@ import os
 import random
 import re
 from typing import Optional
-import emojis
+import emoji
 import asyncio
 
 import discord
