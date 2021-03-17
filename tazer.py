@@ -181,7 +181,7 @@ async def create_role(role_name):
         role = await guild.create_role(name=role_name, color=role_color)
     else:
         print(f'Role {role_name} existed!') # for debugging purposes
-        raise
+        raise discord.DiscordException
     return role
 
 
@@ -207,7 +207,7 @@ async def create_private_voice_channel(channel_name, role_allowed):
     guild = discord.utils.get(client.guilds, name=GUILD)
     if discord.utils.get(guild.voice_channels, name=channel_name):
         print(f"Voice channel {channel_name} existed!")
-        raise
+        raise discord.DiscordException
     else:
         assert role_allowed is not None
         overwrites = {
@@ -226,7 +226,7 @@ async def create_private_text_channel(channel_name, role_allowed):
     guild = discord.utils.get(client.guilds, name=GUILD)
     if discord.utils.get(guild.text_channels, name=channel_name):
         print(f"Text channel {channel_name} existed!")
-        raise
+        raise discord.DiscordException
     else:
         assert role_allowed is not None
         overwrites = {
@@ -243,10 +243,10 @@ async def assign_role(member, role):
 
 
 async def create_discussion_room(host, room_name, members):
-    role = None
-    p_text_channel = None
-    p_voice_channel = None
     try:
+        role = None
+        p_text_channel = None
+        p_voice_channel = None
         # create a role and both private text and voice channels
         role = await create_role(room_name)
         p_text_channel = await create_private_text_channel(room_name, role)
@@ -264,8 +264,8 @@ async def create_discussion_room(host, room_name, members):
             'text_channel': p_text_channel,
             VOICE_CHANNEL: p_voice_channel
         }
-    except:
-        await destruct_discussion_room(role, p_text_channel, p_voice_channel)
+    except discord.DiscordException:
+        p_text_channel = await destruct_discussion_room(role, p_text_channel, p_voice_channel)
     return p_text_channel
 
 
