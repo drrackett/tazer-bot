@@ -1,7 +1,7 @@
 import os
 import random
 import re
-
+from typing import Optional
 import discord
 from dotenv import load_dotenv
 
@@ -58,7 +58,6 @@ async def cleanup():
     await CATEGORY.delete()
     await client.close()
 
-
 @client.event
 async def on_message(message):
 
@@ -88,7 +87,8 @@ async def on_message(message):
     # elif re.search("^t! config category ", message.content):
     
     elif message.content.startswith("t! clear"):
-        await clear(message)
+        lines = int(message.content.split("t! clear ", 1)[1])
+        await clear_messages(message, lines)
 
     elif message.content.startswith("t! disconnect"):
         await message.delete()
@@ -299,7 +299,9 @@ async def delete_discussion_room(message):
     await role.delete()
 
 #clear text messages in discussion room or text channel
-async def clear(ctx, amount):
-    await ctx.channel.purge(limit=amount)
+@client.event
+async def clear_messages(ctx, limit= 1):
+    await ctx.channel.purge(limit=limit+1)
+    
 
 client.run(TOKEN)
