@@ -14,11 +14,11 @@ Still a work in progress
 ### Prerequisites
 Docker
 1. Create a discord bot on Discord Developer Portal
-2. Create a .env file with your bot token
+2. Create a .env file with your bot token <br/>
 ...```DISCORD_TOKEN=YOUR_BOT_TOKEN```...
-3. Build an image with Docker
+3. Build an image with Docker <br/>
 ...```docker build -t imageName```...
-4. Run the image as container
+4. Run the image as container <br/>
 ...```docker run --env-file .env imageName```...
 
 ## License
