@@ -215,7 +215,7 @@ async def create_poll(ctx, question, *options):
     guild = ctx.guild
     channel = ctx.channel
 
-    embedVar = discord.Embed(title=f"{question.capitalize}")
+    embedVar = discord.Embed(title=f"{question.capitalize()}")
     all_emojis = list(emojis.db.get_emoji_aliases().values())
 
     emojis_used = []
