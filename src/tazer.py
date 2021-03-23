@@ -210,6 +210,25 @@ async def clear_messages(ctx, limit=None):
     await ctx.channel.purge(limit=number_of_lines + 1)
 
 
+@bot.command(name='poll', help='Create a poll')
+async def create_poll(ctx, question, *options):
+    guild = ctx.guild
+    channel = ctx.channel
+
+    embedVar = discord.Embed(title=f"{question.capitalize()}")
+    all_emojis = list(emojis.db.get_emoji_aliases().values())
+
+    emojis_used = []
+    for option in options:
+        emoji_unicode = random.choice(all_emojis)
+        embedVar.add_field(name=f"{emoji_unicode}", value=f"{option.capitalize()}", inline=False)
+        emojis_used.append(emoji_unicode)
+
+    bot_msg = await channel.send(embed=embedVar)
+    for emoji in emojis_used:
+        await bot_msg.add_reaction(emoji)
+
+
 @bot.command(name='end', help='Deletes the discussion room')
 async def delete_discussion_room(ctx):
     await ctx.message.delete()
@@ -262,7 +281,7 @@ async def disconnect_all(ctx):
             await destruct_by_room(room_props)
         await category_created.delete()
     await bot.logout()
-
+    
 
 # HOST -- refers to the user that initiated the command to create a discussion-room
 # Notes:
