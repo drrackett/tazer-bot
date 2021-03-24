@@ -358,7 +358,7 @@ async def disconnect(ctx):
 async def disconnect_all(ctx):
     await ctx.message.delete()
 
-    if not bot.is_owner(ctx.author):
+    if not await bot.is_owner(ctx.author):
         return
     
     for guild, guild_props in GUILDS_CONNECTED.items():
