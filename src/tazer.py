@@ -23,6 +23,7 @@ DEFAULT_CATEGORY_NAME = 'Discussion Rooms'
 
 VOICE_CHANNEL_STR = 'voice_channel'
 ADMINS_STR = 'admins'
+MEMBERS_STR = 'members'
 ROLE_STR = 'role'
 TXT_CHANNEL_STR = 'text_channel'
 CATEGORY_STR = 'catagory'
@@ -122,6 +123,16 @@ async def create_discussion_room(ctx, room_name):
         role = await create_role(guild, room_name)
         p_text_channel = await create_private_text_channel(guild, room_name, role)
         p_voice_channel = await create_private_voice_channel(guild, room_name, role)
+        
+        GUILDS_CONNECTED[guild.id][ROOMS_STR][p_text_channel] = {
+            ADMINS_STR: [ctx.author],
+            ROLE_STR: role,
+            MEMBERS_STR: [ctx.author],
+            TXT_CHANNEL_STR: p_text_channel,
+            VOICE_CHANNEL_STR: p_voice_channel
+        }
+
+        room_properties = GUILDS_CONNECTED[guild.id][ROOMS_STR][p_text_channel]
 
         # assign the specific role so that members are allowed to join both channels created
         await ctx.author.add_roles(role)
@@ -129,13 +140,7 @@ async def create_discussion_room(ctx, room_name):
         members_to_be_added = ctx.message.mentions
         for member in members_to_be_added:
             await member.add_roles(role)
-        
-        GUILDS_CONNECTED[guild.id][ROOMS_STR][p_text_channel] = {
-            ADMINS_STR: [ctx.author],
-            ROLE_STR: role,
-            TXT_CHANNEL_STR: p_text_channel,
-            VOICE_CHANNEL_STR: p_voice_channel
-        }
+            room_properties[MEMBERS_STR].append(member)
 
         # send a direct message to the host that the discussion room has been created
         await ctx.author.send(f'{room_name} is created!')
@@ -153,19 +158,21 @@ async def destruct_by_room(room): # room is a dictionary
 async def remove_members(ctx):
     guild = ctx.guild
 
-    text_channel = ctx.channel
+    room = ctx.channel
     all_rooms_created = GUILDS_CONNECTED[guild.id][ROOMS_STR]
+    room_properties = all_rooms_created[room]
 
-    assert ctx.message.author in text_channel.members
+    assert ctx.message.author in room.members
 
-    room_admins = all_rooms_created[text_channel][ADMINS_STR]
+    room_admins = room_properties[ADMINS_STR]
 
     assert ctx.author in room_admins, f'Only admins can remove people from this discussion room!'
 
-    role = all_rooms_created[text_channel][ROLE_STR]
+    role = room_properties[ROLE_STR]
 
     for member in ctx.message.mentions:
         await member.remove_roles(role)
+        room_properties[MEMBERS_STR].remove(member)
 
 
 @bot.command(name='invite', help='Invites users to the discussion room')
@@ -194,11 +201,14 @@ async def invite_members_to_priv_channel(ctx):
     def check(reaction, user):
         return user == ctx.author and str(reaction.emoji) in list(emojis_used.keys())
 
+    room_properties = all_rooms_created[txt_channel]
+
     try:
         while True:
             reaction, user = await bot.wait_for('reaction_add', timeout=7.0, check=check)
             member_to_be_added = emojis_used[str(reaction.emoji)]
             await member_to_be_added.add_roles(role_to_be_assigned)
+            room_properties[MEMBERS_STR].append(member_to_be_added)
             await ctx.channel.send(f'{member_to_be_added.name} has been added!')
     except asyncio.TimeoutError:
         await bot_msg.clear_reactions()
@@ -270,6 +280,30 @@ async def admins_list(ctx):
 '''
 
 
+@bot.command(name='leave', help='Leave discussion room')
+async def leave(ctx):
+    guild = ctx.guild
+    room = ctx.channel
+    member = ctx.author
+    all_rooms_created = GUILDS_CONNECTED[guild.id][ROOMS_STR]
+
+    # To make sure command can only be invoked in discussion_rooms created by the bot
+    if room not in all_rooms_created:
+        return
+
+    room_properties = all_rooms_created[room]
+
+    role = room_properties[ROLE_STR]
+    all_members = room_properties[MEMBERS_STR]
+
+    await member.remove_roles(role)
+    all_members.remove(member)
+
+    if not all_members:   # List is empty
+        all_rooms_created.pop(room)
+        await destruct_by_room(room_properties)
+
+
 @bot.command(name='end', help='Deletes the discussion room')
 async def delete_discussion_room(ctx):
     await ctx.message.delete()
@@ -278,7 +312,7 @@ async def delete_discussion_room(ctx):
     text_channel = ctx.channel
     all_rooms_created = GUILDS_CONNECTED[guild.id][ROOMS_STR]
 
-    assert ctx.message.author in text_channel.members
+    # assert ctx.message.author in text_channel.members
 
     # to make sure t! end is initiated in a room created by the bot
     assert text_channel in all_rooms_created
