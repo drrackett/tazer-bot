@@ -47,6 +47,14 @@ async def on_ready():
         GUILDS_CONNECTED[guild.id][ROOMS_STR] = {}
 
 
+@bot.event
+async def on_guild_join(guild):
+    category = await guild.create_category_channel(DEFAULT_CATEGORY_NAME)
+    GUILDS_CONNECTED[guild.id] = {}
+    GUILDS_CONNECTED[guild.id][CATEGORY_STR] = category
+    GUILDS_CONNECTED[guild.id][ROOMS_STR] = {}
+
+
 # create role
 async def create_role(guild, role_name):
     if discord.utils.get(guild.roles, name=role_name) is None:
@@ -345,10 +353,14 @@ async def disconnect(ctx):
     GUILDS_CONNECTED.pop(guild_id)
 
 
-# TEMPORARY COMMAND FOR THE DEVELOPERS ONLY PLEASE
+# COMMAND FOR THE BOT OWNER ONLY -- to be replaced with on_guild_remove
 @bot.command(name='logout', help='Temporary command to kill all bots')
 async def disconnect_all(ctx):
     await ctx.message.delete()
+
+    if not bot.is_owner(ctx.author):
+        return
+    
     for guild, guild_props in GUILDS_CONNECTED.items():
         category_created = guild_props[CATEGORY_STR]
         rooms_created = guild_props[ROOMS_STR]
