@@ -424,6 +424,8 @@ async def add_members(message):
         member = discord.utils.get(guild.members, name=name)
         await assign_role(member, role)
 
+        TEST
+
 ''' 
 
 bot.run(TOKEN)
