@@ -22,7 +22,8 @@ GUILDS_CONNECTED = {}
 DEFAULT_CATEGORY_NAME = 'Discussion Rooms'
 
 VOICE_CHANNEL_STR = 'voice_channel'
-HOST_STR = 'host'
+ADMINS_STR = 'admins'
+MEMBERS_STR = 'members'
 ROLE_STR = 'role'
 TXT_CHANNEL_STR = 'text_channel'
 CATEGORY_STR = 'catagory'
@@ -44,6 +45,14 @@ async def on_ready():
         GUILDS_CONNECTED[guild.id] = {}
         GUILDS_CONNECTED[guild.id][CATEGORY_STR] = category
         GUILDS_CONNECTED[guild.id][ROOMS_STR] = {}
+
+
+@bot.event
+async def on_guild_join(guild):
+    category = await guild.create_category_channel(DEFAULT_CATEGORY_NAME)
+    GUILDS_CONNECTED[guild.id] = {}
+    GUILDS_CONNECTED[guild.id][CATEGORY_STR] = category
+    GUILDS_CONNECTED[guild.id][ROOMS_STR] = {}
 
 
 # create role
@@ -122,6 +131,16 @@ async def create_discussion_room(ctx, room_name):
         role = await create_role(guild, room_name)
         p_text_channel = await create_private_text_channel(guild, room_name, role)
         p_voice_channel = await create_private_voice_channel(guild, room_name, role)
+        
+        GUILDS_CONNECTED[guild.id][ROOMS_STR][p_text_channel] = {
+            ADMINS_STR: [ctx.author],
+            ROLE_STR: role,
+            MEMBERS_STR: [ctx.author],
+            TXT_CHANNEL_STR: p_text_channel,
+            VOICE_CHANNEL_STR: p_voice_channel
+        }
+
+        room_properties = GUILDS_CONNECTED[guild.id][ROOMS_STR][p_text_channel]
 
         # assign the specific role so that members are allowed to join both channels created
         await ctx.author.add_roles(role)
@@ -129,13 +148,7 @@ async def create_discussion_room(ctx, room_name):
         members_to_be_added = ctx.message.mentions
         for member in members_to_be_added:
             await member.add_roles(role)
-        
-        GUILDS_CONNECTED[guild.id][ROOMS_STR][p_text_channel] = {
-            HOST_STR: ctx.author,
-            ROLE_STR: role,
-            TXT_CHANNEL_STR: p_text_channel,
-            VOICE_CHANNEL_STR: p_voice_channel
-        }
+            room_properties[MEMBERS_STR].append(member)
 
         # send a direct message to the host that the discussion room has been created
         await ctx.author.send(f'{room_name} is created!')
@@ -153,19 +166,21 @@ async def destruct_by_room(room): # room is a dictionary
 async def remove_members(ctx):
     guild = ctx.guild
 
-    text_channel = ctx.channel
+    room = ctx.channel
     all_rooms_created = GUILDS_CONNECTED[guild.id][ROOMS_STR]
+    room_properties = all_rooms_created[room]
 
-    assert ctx.message.author in text_channel.members
+    assert ctx.message.author in room.members
 
-    room_host = all_rooms_created[text_channel][HOST_STR]
+    room_admins = room_properties[ADMINS_STR]
 
-    assert ctx.author == room_host, f'Only the host, {room_host} can remove people from this discussion room!'
+    assert ctx.author in room_admins, f'Only admins can remove people from this discussion room!'
 
-    role = all_rooms_created[text_channel][ROLE_STR]
+    role = room_properties[ROLE_STR]
 
     for member in ctx.message.mentions:
         await member.remove_roles(role)
+        room_properties[MEMBERS_STR].remove(member)
 
 
 @bot.command(name='invite', help='Invites users to the discussion room')
@@ -194,11 +209,14 @@ async def invite_members_to_priv_channel(ctx):
     def check(reaction, user):
         return user == ctx.author and str(reaction.emoji) in list(emojis_used.keys())
 
+    room_properties = all_rooms_created[txt_channel]
+
     try:
         while True:
             reaction, user = await bot.wait_for('reaction_add', timeout=7.0, check=check)
             member_to_be_added = emojis_used[str(reaction.emoji)]
             await member_to_be_added.add_roles(role_to_be_assigned)
+            room_properties[MEMBERS_STR].append(member_to_be_added)
             await ctx.channel.send(f'{member_to_be_added.name} has been added!')
     except asyncio.TimeoutError:
         await bot_msg.clear_reactions()
@@ -229,6 +247,71 @@ async def create_poll(ctx, question, *options):
         await bot_msg.add_reaction(emoji)
 
 
+@bot.command(name='assign', help='Assign @members admin of the discussion room')
+async def assign_admin(ctx):
+    await ctx.message.delete()
+
+    guild = ctx.guild
+    all_rooms_created = GUILDS_CONNECTED[guild.id][ROOMS_STR]
+    room = ctx.channel
+
+    # To make sure command can only be invoked in discussion_rooms created by the bot
+    if room not in all_rooms_created:
+        return
+    
+    room_properties = GUILDS_CONNECTED[guild.id][ROOMS_STR][room]
+    room_admins = room_properties[ADMINS_STR]
+    role_to_be_assigned = room_properties[ROLE_STR]
+
+    if ctx.author in room_admins:
+        for member_to_be_admin in ctx.message.mentions:
+            # To avoid duplicates in room_admins list
+            # assumed only members in the discussion_room can be mentioned
+            if member_to_be_admin not in room_admins:
+                room_admins.append(member_to_be_admin)
+                await room.send(f'{member_to_be_admin.mention} is now an admin of {room.name}!')
+    else:
+        await room.send('Only admins of this discussion room can assign admins!')
+
+
+''' ************************ TBD WHETHER TO ADD *******************************
+@bot.command(name='admins', help='Assign @users admin of the discussion room')
+async def admins_list(ctx):
+    guild = ctx.guild
+    room = ctx.channel
+    room_properties = GUILDS_CONNECTED[guild.id][ROOMS_STR][room]
+
+    room_admins = room_properties[ADMINS_STR]
+
+    for admin in room_admins:
+        await room.send(admin.mention)
+'''
+
+
+@bot.command(name='leave', help='Leave discussion room')
+async def leave(ctx):
+    guild = ctx.guild
+    room = ctx.channel
+    member = ctx.author
+    all_rooms_created = GUILDS_CONNECTED[guild.id][ROOMS_STR]
+
+    # To make sure command can only be invoked in discussion_rooms created by the bot
+    if room not in all_rooms_created:
+        return
+
+    room_properties = all_rooms_created[room]
+
+    role = room_properties[ROLE_STR]
+    all_members = room_properties[MEMBERS_STR]
+
+    await member.remove_roles(role)
+    all_members.remove(member)
+
+    if not all_members:   # List is empty
+        all_rooms_created.pop(room)
+        await destruct_by_room(room_properties)
+
+
 @bot.command(name='end', help='Deletes the discussion room')
 async def delete_discussion_room(ctx):
     await ctx.message.delete()
@@ -237,15 +320,15 @@ async def delete_discussion_room(ctx):
     text_channel = ctx.channel
     all_rooms_created = GUILDS_CONNECTED[guild.id][ROOMS_STR]
 
-    assert ctx.message.author in text_channel.members
+    # assert ctx.message.author in text_channel.members
 
     # to make sure t! end is initiated in a room created by the bot
     assert text_channel in all_rooms_created
 
-    room_host = all_rooms_created[text_channel][HOST_STR]
+    room_admins = all_rooms_created[text_channel][ADMINS_STR]
 
     # assertations
-    assert ctx.author == room_host, f'Only the host, {room_host} can end this discussion room!'
+    assert ctx.author in room_admins, f'Only admins can end this discussion room!'
 
     voice_channel = all_rooms_created[text_channel][VOICE_CHANNEL_STR]
     role = all_rooms_created[text_channel][ROLE_STR]
@@ -270,10 +353,14 @@ async def disconnect(ctx):
     GUILDS_CONNECTED.pop(guild_id)
 
 
-# TEMPORARY COMMAND FOR THE DEVELOPERS ONLY PLEASE
+# COMMAND FOR THE BOT OWNER ONLY -- to be replaced with on_guild_remove
 @bot.command(name='logout', help='Temporary command to kill all bots')
 async def disconnect_all(ctx):
     await ctx.message.delete()
+
+    if not await bot.is_owner(ctx.author):
+        return
+    
     for guild, guild_props in GUILDS_CONNECTED.items():
         category_created = guild_props[CATEGORY_STR]
         rooms_created = guild_props[ROOMS_STR]
